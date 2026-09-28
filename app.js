@@ -1,185 +1,419 @@
-const seedLocations = [
-  { id:'D-04', name:'Drain D-04 · Lake North', state:'Telangana', region:'South India', city:'Hyderabad', water:'Lake North', x:49, y:42, base:79, catchment:88, traffic:82, construction:73, waste:61, confidence:72, arrival:'2h 40m', action:'Inspect + temporary screen', status:'Pending', summary:'Large paved catchment and high traffic exposure connect this drain to Lake North before heavy rain.', source:'Fallback catchment record' },
-  { id:'D-11', name:'Outfall D-11 · Bellandur edge', state:'Karnataka', region:'South India', city:'Bengaluru', water:'Bellandur Lake', x:47, y:57, base:76, catchment:84, traffic:77, construction:62, waste:73, confidence:68, arrival:'3h 10m', action:'Inspect + sample water', status:'Pending', summary:'High waste activity and a large paved catchment increase the priority of this outfall.', source:'Fallback catchment record' },
-  { id:'D-02', name:'Drain D-02 · Yamuna Link', state:'Delhi', region:'North India', city:'Delhi', water:'Yamuna floodplain', x:54, y:23, base:72, catchment:69, traffic:91, construction:65, waste:58, confidence:81, arrival:'1h 55m', action:'Clean inlet', status:'Protected', summary:'Heavy traffic exposure and fast rainfall arrival make early inspection valuable.', source:'Field action record + fallback' },
-  { id:'D-07', name:'Outfall D-07 · Mithi corridor', state:'Maharashtra', region:'West India', city:'Mumbai', water:'Mithi River', x:41, y:34, base:70, catchment:80, traffic:86, construction:52, waste:68, confidence:77, arrival:'2h 05m', action:'Inspect + clean', status:'Pending', summary:'Dense urban surfaces and traffic expose this corridor to a high first-flush load.', source:'Fallback catchment record' },
-  { id:'D-15', name:'Drain D-15 · Adyar approach', state:'Tamil Nadu', region:'South India', city:'Chennai', water:'Adyar River', x:59, y:67, base:67, catchment:74, traffic:71, construction:60, waste:56, confidence:65, arrival:'3h 45m', action:'Monitor + inspect', status:'Pending', summary:'A mixed residential catchment drains toward a sensitive river approach.', source:'Fallback catchment record' },
-  { id:'D-21', name:'Drain D-21 · East Canal', state:'West Bengal', region:'East & North-East India', city:'Kolkata', water:'East Kolkata Wetlands', x:66, y:41, base:64, catchment:72, traffic:63, construction:54, waste:79, confidence:61, arrival:'4h 20m', action:'Place debris screen', status:'Pending', summary:'Waste activity is the leading risk factor near this wetland-connected drain.', source:'Fallback catchment record' },
-  { id:'D-31', name:'Drain D-31 · Jaipur market', state:'Rajasthan', region:'North India', city:'Jaipur', water:'Amanishah drain', x:39, y:28, base:57, catchment:60, traffic:70, construction:49, waste:66, confidence:56, arrival:'5h 05m', action:'Inspect inlet', status:'Pending', summary:'Market waste and paved surfaces create a moderate-to-high priority.', source:'Fallback catchment record' },
-  { id:'D-42', name:'Drain D-42 · Guwahati lowland', state:'Assam', region:'East & North-East India', city:'Guwahati', water:'Bharalu River', x:70, y:26, base:52, catchment:63, traffic:45, construction:42, waste:58, confidence:49, arrival:'5h 40m', action:'Monitor', status:'Protected', summary:'Lower traffic exposure, but a lowland connection keeps this point under watch.', source:'Fallback catchment record' }
-];
+import { riskLevel } from './shared/risk.js';
 
-const ACTIONS = ['Inspect','Clean','Temporary screen / diversion','Sample water','Monitor'];
-const state = JSON.parse(localStorage.getItem('firstflush-state') || 'null') || {
-  scenario: { dry: 18, rain: 'heavy', region: 'All India', city: 'All cities' },
-  actions: { 'D-02': 'Clean', 'D-42': 'Monitor' },
-  observations: []
+const ACTIONS = ['Inspect', 'Clean', 'Temporary screen / diversion', 'Sample water', 'Monitor'];
+const STORAGE_KEY = 'firstflush-ui-state-v2';
+const defaultUiState = {
+  scenario: { dryDays: 18, rainfall: 62, region: 'All India' },
+  filters: { state: 'all', city: 'all', risk: 'all' }
 };
-let locations = [...seedLocations];
-let currentLocation = null;
-const $ = id => document.getElementById(id);
-const rainfall = { light: 8, moderate: 24, heavy: 62, extreme: 110 };
-const riskLabel = score => score >= 80 ? 'very-high' : score >= 65 ? 'high' : score >= 45 ? 'medium' : 'low';
-const titleCase = value => value.replaceAll('-', ' ').replace(/\b\w/g, c => c.toUpperCase());
 
-function persist() { localStorage.setItem('firstflush-state', JSON.stringify(state)); }
-function rainValue() { return rainfall[state.scenario.rain]; }
-function score(location) {
-  const dry = Math.min(100, state.scenario.dry / 18 * 100);
-  const rain = Math.min(100, rainValue() / 62 * 100);
-  const raw = .25 * dry + .20 * rain + .15 * location.catchment + .15 * location.traffic + .10 * location.construction + .10 * location.waste + .05 * (location.water ? 80 : 40);
-  return Math.round(Math.min(99, raw * .82 + location.base * .18));
-}
-function regionMatches(location) { return state.scenario.region === 'All India' || location.region === state.scenario.region; }
-function cityMatches(location) { return state.scenario.city === 'All cities' || location.city === state.scenario.city; }
-function visibleLocations() { return locations.filter(regionMatches).filter(cityMatches); }
-function computedLocations() { return visibleLocations().map(location => ({ ...location, score: score(location), level: riskLabel(score(location)) })).sort((a,b) => b.score - a.score); }
+const uiState = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') || defaultUiState;
+const appState = {
+  locations: [],
+  topLocationId: null,
+  currentDetail: null,
+  health: null,
+  weather: null,
+  loading: false,
+  map: null,
+  markers: []
+};
 
-function ensureCityFilter() {
-  const filters = document.querySelector('.queue-filters');
-  if (!filters || $('cityFilter')) return;
-  const select = document.createElement('select');
-  select.id = 'cityFilter';
-  select.setAttribute('aria-label', 'Filter by city');
-  filters.insertBefore(select, filters.firstChild);
-  select.onchange = e => { state.scenario.city = e.target.value; persist(); render(); };
+const $ = (id) => document.getElementById(id);
+
+function persistUiState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(uiState));
 }
-function populateFilters() {
-  ensureCityFilter();
-  const states = [...new Set(locations.map(l => l.state))].sort();
-  const cities = [...new Set(locations.map(l => l.city))].sort();
-  $('stateFilter').innerHTML = '<option value="all">All states</option>' + states.map(s => `<option value="${s}">${s}</option>`).join('');
-  $('cityFilter').innerHTML = '<option value="all">All cities</option>' + cities.map(c => `<option value="${c}">${c}</option>`).join('');
-  $('cityFilter').value = state.scenario.city === 'All cities' ? 'all' : state.scenario.city;
+
+function titleCase(value) {
+  return String(value || '').replaceAll('-', ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 }
-function updateScenarioControls() {
-  $('dryDays').value = state.scenario.dry;
-  $('dryDaysOutput').textContent = `${state.scenario.dry} days`;
-  $('rainSelect').value = state.scenario.rain;
-  $('regionSelect').value = state.scenario.region;
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
-function render() {
-  updateScenarioControls();
-  populateFilters();
-  const list = computedLocations();
-  const high = list.filter(l => l.score >= 65).length;
-  $('metricDryDays').textContent = `${state.scenario.dry} days`;
-  $('highRiskCount').textContent = high;
-  $('locationsShown').textContent = list.length;
-  const top = list[0];
-  if (top) {
-    $('topPriorityName').textContent = top.name.split(' · ')[0];
-    $('topPriorityScore').textContent = top.score;
-    $('topPrioritySeverity').textContent = titleCase(top.level).toUpperCase();
-    $('topPrioritySeverity').className = `severity ${top.level}`;
-    $('topPrioritySummary').textContent = top.summary;
-    $('topReasons').innerHTML = [
-      ['Dry spell', `${state.scenario.dry} days`],
-      ['Rain forecast', `${rainValue()} mm · ${state.scenario.rain}`],
-      ['Paved catchment', `${top.catchment}/100`],
-      ['Traffic exposure', `${top.traffic}/100`]
-    ].map(([name,value]) => `<div class="reason"><span>${name}</span><b>${value}</b></div>`).join('');
-    $('openTopPriority').onclick = () => openDetail(top.id);
+
+function toast(message) {
+  const element = $('toast');
+  element.textContent = message;
+  element.classList.add('show');
+  window.clearTimeout(toast.timer);
+  toast.timer = window.setTimeout(() => element.classList.remove('show'), 3200);
+}
+
+function setStatus(message, isError = false, retryAction = null) {
+  const banner = $('statusBanner');
+  banner.classList.toggle('error', isError);
+  banner.textContent = message;
+  if (retryAction) {
+    const retryButton = document.createElement('button');
+    retryButton.type = 'button';
+    retryButton.textContent = 'Retry';
+    retryButton.onclick = retryAction;
+    banner.appendChild(retryButton);
   }
-  renderMap(list);
-  renderQueue(list);
-  updateCoverage();
 }
-function renderMap(list) {
-  const map = $('map');
-  map.querySelectorAll('.map-pin').forEach(pin => pin.remove());
-  list.forEach(location => {
-    const pin = document.createElement('button');
-    pin.className = `map-pin ${location.level}`;
-    pin.style.left = `${location.x}%`;
-    pin.style.top = `${location.y}%`;
-    pin.title = `${location.name}: ${location.score}/100`;
-    pin.setAttribute('aria-label', `${location.name}, risk ${location.score} out of 100`);
-    pin.innerHTML = '<span>•</span>';
-    pin.onclick = () => openDetail(location.id);
-    map.appendChild(pin);
+
+async function api(path, options = {}) {
+  const response = await fetch(path, {
+    ...options,
+    headers: {
+      ...(options.headers || {})
+    }
   });
+  const isJson = response.headers.get('content-type')?.includes('application/json');
+  const body = isJson ? await response.json() : await response.text();
+  if (!response.ok) {
+    const message = body?.message || body?.error || `${response.status} ${response.statusText}`;
+    throw new Error(message);
+  }
+  return body;
 }
+
+function queryString(includeFilters = true) {
+  const params = new URLSearchParams();
+  params.set('dryDays', String(uiState.scenario.dryDays));
+  params.set('rainfall', String(uiState.scenario.rainfall));
+  params.set('region', uiState.scenario.region);
+  if (includeFilters) {
+    if (uiState.filters.state !== 'all') params.set('state', uiState.filters.state);
+    if (uiState.filters.city !== 'all') params.set('city', uiState.filters.city);
+    if (uiState.filters.risk !== 'all') params.set('risk', uiState.filters.risk);
+  }
+  return params.toString();
+}
+
+function updateTopPriority(list) {
+  const top = list[0];
+  if (!top) {
+    $('topPriorityName').textContent = 'No matching locations';
+    $('topPriorityScore').textContent = '--';
+    $('topPrioritySummary').textContent = 'Change filters or scenario to view priorities.';
+    $('topReasons').innerHTML = '';
+    return;
+  }
+
+  appState.topLocationId = top.id;
+  $('topPriorityName').textContent = top.name;
+  $('topPriorityScore').textContent = top.score;
+  $('topPrioritySeverity').textContent = titleCase(top.level).toUpperCase();
+  $('topPrioritySeverity').className = `severity ${top.level}`;
+  $('topPrioritySummary').textContent = `${top.provenance.sourceLabel}. ${top.provenance.note}`;
+  $('topReasons').innerHTML = [
+    ['Dry spell', `${uiState.scenario.dryDays} days`],
+    ['Rain forecast', `${uiState.scenario.rainfall} mm`],
+    ['Paved catchment', `${top.factors.catchment}/100`],
+    ['Traffic exposure', `${top.factors.traffic}/100`]
+  ].map(([name, value]) => `<div class="reason"><span>${escapeHtml(name)}</span><b>${escapeHtml(value)}</b></div>`).join('');
+}
+
 function renderQueue(list) {
-  const stateFilter = $('stateFilter').value;
-  const riskFilter = $('riskFilter').value;
-  const view = list.filter(l => (stateFilter === 'all' || l.state === stateFilter) && (riskFilter === 'all' || l.level === riskFilter));
-  $('queueList').innerHTML = view.map(location => `<div class="queue-item"><div><h3>${location.name}</h3><p>${location.city}, ${location.state} · ${location.water}</p></div><div class="queue-score"><span class="severity ${location.level}">${location.score}</span><small>relative risk</small></div><div class="queue-action">${location.action}<br><span class="${location.status === 'Protected' ? 'status-done' : ''}">${location.status}</span></div><button aria-label="Inspect ${location.name}" onclick="openDetail('${location.id}')">Inspect</button></div>`).join('') || '<p class="disclaimer">No locations match this filter.</p>';
+  $('queueList').innerHTML = list.map((location) => {
+    const severity = riskLevel(location.score);
+    return `<div class="queue-item"><div><h3>${escapeHtml(location.name)}</h3><p>${escapeHtml(location.city)}, ${escapeHtml(location.state)} · ${escapeHtml(location.waterBody)}</p></div><div class="queue-score"><span class="severity ${severity}">${escapeHtml(location.score)}</span><small>${escapeHtml(location.confidence)}% confidence</small></div><div class="queue-action">${location.status === 'protected' ? 'Protected' : 'Pending'}<br><span>${escapeHtml(location.provenance.recordType)}</span></div><button aria-label="Inspect ${escapeHtml(location.name)}" onclick="window.openDetail('${escapeHtml(location.id)}')">Inspect</button></div>`;
+  }).join('') || '<p class="disclaimer">No locations match this filter.</p>';
 }
-function updateCoverage() {
-  const total = locations.length;
-  const done = locations.filter(l => l.status === 'Protected').length;
-  const pct = total ? Math.round(done / total * 100) : 0;
-  $('actionsCount').textContent = Object.keys(state.actions).length;
+
+function refreshFilterOptions(items) {
+  const states = [...new Set(items.map((item) => item.state))].sort();
+  const cities = [...new Set(items.map((item) => item.city))].sort();
+
+  $('stateFilter').innerHTML = '<option value="all">All states</option>' + states.map((stateName) => `<option value="${stateName}">${stateName}</option>`).join('');
+  $('cityFilter').innerHTML = '<option value="all">All cities</option>' + cities.map((cityName) => `<option value="${cityName}">${cityName}</option>`).join('');
+
+  $('stateFilter').value = states.includes(uiState.filters.state) ? uiState.filters.state : 'all';
+  $('cityFilter').value = cities.includes(uiState.filters.city) ? uiState.filters.city : 'all';
+}
+
+function updateMetrics(list) {
+  $('metricDryDays').textContent = `${uiState.scenario.dryDays} days`;
+  $('highRiskCount').textContent = list.filter((item) => item.score >= 65).length;
+  $('locationsShown').textContent = list.length;
+  const done = list.filter((item) => item.status === 'protected').length;
+  $('actionsCount').textContent = done;
+  const pct = list.length ? Math.round((done / list.length) * 100) : 0;
   $('coverageStat').textContent = `${pct}%`;
   $('coverageBar').style.width = `${pct}%`;
-}
-function openDetail(id) {
-  const location = locations.find(item => item.id === id);
-  if (!location) return;
-  currentLocation = location;
-  const value = score(location);
-  $('dialogTitle').textContent = location.name;
-  $('dialogBody').innerHTML = `<div class="detail-meta"><div><small>Relative risk</small><b>${value}/100 · ${titleCase(riskLabel(value))}</b></div><div><small>Rain arrival window</small><b>${location.arrival}</b></div><div><small>Connected water body</small><b>${location.water}</b></div><div><small>Data confidence</small><b>${location.confidence}% · ${location.source}</b></div></div><p class="warning-box">${location.summary} This is an estimate for prioritization, not a laboratory result.</p><h3>Factor breakdown</h3><div class="detail-factors">${[['Dry-period accumulation', Math.min(100, state.scenario.dry / 18 * 100)], ['Rainfall intensity', Math.min(100, rainValue() / 62 * 100)], ['Paved catchment', location.catchment], ['Traffic exposure', location.traffic], ['Construction proximity', location.construction], ['Waste / animal activity', location.waste]].map(([name,value]) => `<div class="factor-row"><span>${name}</span><div class="factor-bar"><span style="width:${value}%"></span></div><b>${Math.round(value)}</b></div>`).join('')}</div><div class="action-editor"><label>Recommended field action<select id="detailAction">${ACTIONS.map(action => `<option ${state.actions[location.id] === action || (!state.actions[location.id] && location.action.startsWith(action)) ? 'selected' : ''}>${action}</option>`).join('')}</select></label><label>Action note<textarea id="actionNote" rows="2" placeholder="What was observed or done?"></textarea></label><label class="upload-label">Photo evidence <input id="evidenceInput" type="file" accept="image/*" /><small id="fileName">Optional · stored locally for this browser session</small></label></div><p class="disclaimer">Source: ${location.source}. Observation freshness and completeness affect confidence. Nationwide coverage is incomplete.</p>`;
-  $('dialogAction').textContent = location.status === 'Protected' ? 'Update action →' : 'Record action →';
-  $('detailDialog').showModal();
-}
-function markAction() {
-  if (!currentLocation) return;
-  const action = $('detailAction')?.value || 'Inspect';
-  state.actions[currentLocation.id] = action;
-  currentLocation.status = 'Protected';
-  currentLocation.action = action;
-  persist();
-  $('detailDialog').close();
-  render();
-  toast(`${currentLocation.id} updated: ${action}.`);
-}
-function exportCsv() {
-  const list = computedLocations();
-  const rows = [['FirstFlush India priority report'], ['Generated', new Date().toISOString()], ['Region', state.scenario.region], ['City', state.scenario.city], ['Dry spell', `${state.scenario.dry} days`], ['Rainfall', `${rainValue()} mm (${state.scenario.rain})`], [], ['ID','Location','State','City','Risk','Level','Recommended action','Status','Confidence','Source'], ...list.map(l => [l.id,l.name,l.state,l.city,l.score,l.level,l.action,l.status,`${l.confidence}%`,l.source])];
-  const csv = rows.map(row => row.map(value => `"${String(value ?? '').replaceAll('"','""')}"`).join(',')).join('\n');
-  const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'})); link.download = 'firstflush-priority-report.csv'; link.click();
-  toast('CSV priority report downloaded.');
-}
-function printReport() {
-  const list = computedLocations();
-  const rows = list.map(l => `<tr><td>${l.id}</td><td>${l.name}</td><td>${l.state}</td><td>${l.score}/100</td><td>${titleCase(l.level)}</td><td>${l.action}</td><td>${l.status}</td></tr>`).join('');
-  const report = window.open('', '_blank', 'width=1000,height=700');
-  if (!report) { toast('Allow pop-ups to print the report.'); return; }
-  report.document.write(`<!doctype html><title>FirstFlush India priority report</title><style>body{font:14px Arial;color:#102326;padding:36px}h1{font-size:26px}small{color:#647572}table{border-collapse:collapse;width:100%;margin-top:25px}th,td{border:1px solid #dce6e1;padding:9px;text-align:left}th{background:#e9f3ef}.note{margin-top:22px;background:#fff8e9;padding:12px}</style><h1>FirstFlush India · Priority report</h1><small>${new Date().toLocaleString('en-IN')} · ${state.scenario.region} · ${state.scenario.city}</small><p>Scenario: ${state.scenario.dry} dry days; ${rainValue()} mm ${state.scenario.rain} rainfall fallback context.</p><table><thead><tr><th>ID</th><th>Location</th><th>State</th><th>Risk</th><th>Level</th><th>Action</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table><p class="note">This report contains estimated relative prioritization scores, not laboratory water-quality results. Fallback records are not official municipal measurements.</p><script>window.onload=()=>window.print()<\/script>`);
-  report.document.close();
-}
-function toast(message) { const element = $('toast'); element.textContent = message; element.classList.add('show'); window.clearTimeout(toast.timer); toast.timer = window.setTimeout(() => element.classList.remove('show'), 3200); }
-function addObservation(event) {
-  event.preventDefault();
-  const data = new FormData(event.target);
-  const name = String(data.get('name')).trim();
-  const condition = String(data.get('condition'));
-  const hash = [...name].reduce((total, char) => total + char.charCodeAt(0), 0);
-  const newLocation = { id:`OBS-${locations.length + 1}`, name, state:String(data.get('state')), region:'South India', city:'Field observation', water:'To be verified', x:25 + hash % 50, y:20 + hash % 55, base:58, catchment:55, traffic:50, construction:45, waste:condition.includes('Blocked') ? 80 : 40, confidence:25, arrival:'Pending forecast', action:'Verify observation', status:'Pending', summary:String(data.get('notes') || 'Community observation awaiting verification.'), source:'Community field observation · pending verification' };
-  locations.push(newLocation); state.observations.push({ id:newLocation.id, createdAt:new Date().toISOString(), condition }); persist(); populateFilters(); event.target.reset(); $('observationDialog').close(); render(); toast('Observation saved as pending verification.');
-}
-function bindEvents() {
-  $('dryDays').oninput = event => { state.scenario.dry = Number(event.target.value); persist(); render(); };
-  $('rainSelect').onchange = event => { state.scenario.rain = event.target.value; persist(); render(); };
-  $('regionSelect').onchange = event => { state.scenario.region = event.target.value; state.scenario.city = 'All cities'; persist(); render(); };
-  $('stateFilter').onchange = () => renderQueue(computedLocations());
-  $('riskFilter').onchange = () => renderQueue(computedLocations());
-  $('resetButton').onclick = () => { state.scenario = {dry:18,rain:'heavy',region:'All India',city:'All cities'}; persist(); render(); toast('Assessment context reset.'); };
-  $('runScenario').onclick = () => { state.scenario = {dry:18,rain:'heavy',region:'All India',city:'All cities'}; persist(); render(); document.querySelector('#priorities').scrollIntoView({behavior:'smooth'}); toast('Risk assessment completed for the heavy-rain scenario.'); };
-  $('howItWorks').onclick = () => $('methodDialog').showModal();
-  $('helpButton').onclick = () => $('methodDialog').showModal();
-  $('reportButton').onclick = exportCsv;
-  $('observationButton').onclick = () => $('observationDialog').showModal();
-  $('dialogAction').onclick = markAction;
-  $('observationForm').onsubmit = addObservation;
-  document.querySelectorAll('[data-close]').forEach(button => button.onclick = () => $(button.dataset.close).close());
-  document.querySelectorAll('.view-toggle button').forEach(button => button.onclick = () => { document.querySelectorAll('.view-toggle button').forEach(item => item.classList.remove('active')); button.classList.add('active'); document.body.classList.toggle('list-view', button.dataset.view === 'list'); });
-  $('reportButton').insertAdjacentHTML('afterend', '<button class="text-button full" id="printReportButton">Print / save PDF <span>↗</span></button>');
-  $('printReportButton').onclick = printReport;
+  $('coverageCopy').textContent = `${new Set(list.map((item) => item.state)).size} states · ${list.length} records`;
 }
 
-bindEvents();
-populateFilters();
-render();
+function initMap() {
+  if (appState.map || !window.L) return;
+  const map = window.L.map('mapCanvas', { zoomControl: true }).setView([22.5, 79], 4);
+  appState.map = map;
+
+  let tileErrorCount = 0;
+  const tileLayer = window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 18
+  });
+
+  tileLayer.on('tileerror', () => {
+    tileErrorCount += 1;
+    if (tileErrorCount > 6) {
+      $('mapFallback').classList.remove('hidden');
+      setStatus('Map tiles are unavailable right now. Using list mode still shows live API data.', true);
+    }
+  });
+
+  tileLayer.addTo(map);
+}
+
+function renderMap(items) {
+  initMap();
+  if (!appState.map) return;
+
+  appState.markers.forEach((marker) => marker.remove());
+  appState.markers = [];
+
+  items.forEach((item) => {
+    const marker = window.L.circleMarker([item.lat, item.lon], {
+      radius: 8,
+      weight: 2,
+      color: '#fff',
+      fillColor: item.level === 'very-high' ? '#cf4d46' : item.level === 'high' ? '#d96d3b' : item.level === 'medium' ? '#d99a39' : '#308b67',
+      fillOpacity: 0.95
+    });
+
+    marker.bindTooltip(`${item.name}: ${item.score}/100`);
+    marker.on('click', () => openDetail(item.id));
+    marker.addTo(appState.map);
+    appState.markers.push(marker);
+  });
+}
+
+function renderWeather() {
+  if (!appState.weather) return;
+  $('rainCountdown').textContent = `${appState.weather.rainfallMm} mm`;
+  $('weatherMeta').textContent = `${appState.weather.source} · ${appState.weather.mode === 'live' ? 'Live provider' : 'Fallback'} · ${new Date(appState.weather.lastUpdated).toLocaleString('en-IN')}`;
+}
+
+function renderHealth() {
+  if (!appState.health) return;
+  const liveText = appState.health.profile === 'Live provider' ? 'Live provider mode' : 'Local development mode';
+  $('runtimeMode').innerHTML = `<i></i> ${liveText}`;
+  $('sourceBadge').textContent = `${appState.health.modes.persistence} · ${appState.health.modes.weather}`;
+}
+
+async function loadWeatherForTop(top) {
+  if (!top) return;
+  try {
+    appState.weather = await api(`/api/weather?lat=${top.lat}&lon=${top.lon}`);
+    renderWeather();
+  } catch (error) {
+    setStatus(`Weather load failed: ${error.message}`, true, () => loadWeatherForTop(top));
+  }
+}
+
+async function loadLocations() {
+  appState.loading = true;
+  setStatus('Loading API-backed priority data...');
+
+  try {
+    const payload = await api(`/api/locations?${queryString(true)}`);
+    appState.locations = payload.items;
+    refreshFilterOptions(payload.items);
+    updateTopPriority(payload.items);
+    updateMetrics(payload.items);
+    renderQueue(payload.items);
+    renderMap(payload.items);
+    setStatus(`Loaded ${payload.items.length} locations · ${payload.sourceMode} · ${payload.fallbackRecords} fallback records labelled.`, false);
+    await loadWeatherForTop(payload.items[0]);
+  } catch (error) {
+    setStatus(`Failed to load locations: ${error.message}`, true, () => loadLocations());
+  } finally {
+    appState.loading = false;
+  }
+}
+
+async function loadHealth() {
+  try {
+    appState.health = await api('/api/health');
+    renderHealth();
+  } catch (error) {
+    setStatus(`Health endpoint unavailable: ${error.message}`, true, () => loadHealth());
+  }
+}
+
+function makeHistoryHtml(items) {
+  if (!items.length) return '<p class="disclaimer">No history yet for this location.</p>';
+  return `<div class="history-list">${items.map((item) => {
+    if (item.type === 'action') {
+      return `<div class="history-item"><b>Action · ${escapeHtml(item.actionType)}</b><small>${escapeHtml(new Date(item.createdAt).toLocaleString('en-IN'))} · ${escapeHtml(item.notes || 'No notes')}</small></div>`;
+    }
+    const evidence = item.evidence ? ` · Evidence: ${escapeHtml(item.evidence.originalName)} (${escapeHtml(item.evidence.provider)})` : '';
+    return `<div class="history-item"><b>Observation · ${escapeHtml(item.condition)}</b><small>${escapeHtml(new Date(item.createdAt).toLocaleString('en-IN'))} · ${escapeHtml(item.verificationStatus)}${evidence}</small></div>`;
+  }).join('')}</div>`;
+}
+
+async function openDetail(id) {
+  try {
+    const details = await api(`/api/locations/${id}?${queryString(false)}`);
+    const history = await api(`/api/locations/${id}/history`);
+    appState.currentDetail = details;
+
+    $('dialogTitle').textContent = details.name;
+    $('dialogBody').innerHTML = `<div class="detail-meta"><div><small>Relative risk</small><b>${escapeHtml(details.score)}/100 · ${escapeHtml(titleCase(details.level))}</b></div><div><small>Connected water body</small><b>${escapeHtml(details.waterBody)}</b></div><div><small>Confidence</small><b>${escapeHtml(details.confidence)}%</b></div><div><small>Provenance</small><b>${escapeHtml(details.provenance.sourceLabel)}</b></div></div><p class="warning-box">${escapeHtml(details.provenance.note)}</p><h3>Factor breakdown</h3><div class="detail-factors">${Object.entries(details.factors).map(([name, value]) => `<div class="factor-row"><span>${escapeHtml(titleCase(name))}</span><div class="factor-bar"><span style="width:${Math.min(100, Number(value))}%"></span></div><b>${escapeHtml(Math.round(Number(value)))}</b></div>`).join('')}</div><div class="action-editor"><label>Recommended field action<select id="detailAction">${ACTIONS.map((action) => `<option ${details.actions?.[0]?.actionType === action ? 'selected' : ''}>${escapeHtml(action)}</option>`).join('')}</select></label><label>Action note<textarea id="actionNote" rows="2" placeholder="What was observed or done?"></textarea></label></div><h3>Audit timeline</h3>${makeHistoryHtml(history.items)}`;
+    $('dialogAction').textContent = 'Record action →';
+    $('detailDialog').showModal();
+  } catch (error) {
+    setStatus(`Could not load location detail: ${error.message}`, true, () => openDetail(id));
+  }
+}
+
+window.openDetail = openDetail;
+
+async function recordAction() {
+  if (!appState.currentDetail) return;
+
+  const actionType = $('detailAction')?.value;
+  const notes = $('actionNote')?.value || '';
+  $('dialogAction').disabled = true;
+
+  try {
+    await api(`/api/locations/${appState.currentDetail.id}/actions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actionType, notes })
+    });
+    $('detailDialog').close();
+    toast(`Action recorded for ${appState.currentDetail.id}`);
+    await loadLocations();
+  } catch (error) {
+    setStatus(`Action save failed: ${error.message}`, true, recordAction);
+  } finally {
+    $('dialogAction').disabled = false;
+  }
+}
+
+async function submitObservation(event) {
+  event.preventDefault();
+  const formData = new FormData(event.target);
+
+  try {
+    await api('/api/observations', {
+      method: 'POST',
+      body: formData
+    });
+    $('observationDialog').close();
+    event.target.reset();
+    toast('Observation saved and marked pending verification.');
+    await loadLocations();
+  } catch (error) {
+    setStatus(`Observation save failed: ${error.message}`, true, () => submitObservation(event));
+  }
+}
+
+function exportCsv() {
+  window.open(`/api/reports/priority.csv?${queryString(true)}`, '_blank', 'noopener');
+}
+
+function printReport() {
+  const rows = appState.locations.map((item) => `<tr><td>${escapeHtml(item.id)}</td><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.state)}</td><td>${escapeHtml(item.city)}</td><td>${escapeHtml(item.score)}/100</td><td>${escapeHtml(titleCase(item.level))}</td><td>${escapeHtml(item.confidence)}%</td><td>${escapeHtml(item.status)}</td></tr>`).join('');
+  const report = window.open('', '_blank', 'width=1000,height=700');
+  if (!report) {
+    toast('Allow pop-ups to print the report.');
+    return;
+  }
+  report.document.write(`<!doctype html><title>FirstFlush India report</title><style>body{font:14px Arial;color:#102326;padding:36px}table{border-collapse:collapse;width:100%;margin-top:18px}th,td{border:1px solid #dce6e1;padding:8px;text-align:left}th{background:#eef6f3}.note{margin-top:16px;background:#fff8e9;padding:12px}</style><h1>FirstFlush India priority report</h1><p>Scenario: ${escapeHtml(uiState.scenario.dryDays)} dry days; ${escapeHtml(uiState.scenario.rainfall)} mm rainfall; ${escapeHtml(uiState.scenario.region)}</p><table><thead><tr><th>ID</th><th>Location</th><th>State</th><th>City</th><th>Risk</th><th>Level</th><th>Confidence</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table><p class="note">Estimated relative risk for prioritization. Not a laboratory water-quality measurement.</p><script>window.onload=()=>window.print()<\/script>`);
+  report.document.close();
+}
+
+function resetScenario() {
+  uiState.scenario = { ...defaultUiState.scenario };
+  uiState.filters = { ...defaultUiState.filters };
+  applyStateToControls();
+  persistUiState();
+  loadLocations();
+}
+
+function applyStateToControls() {
+  $('dryDays').value = String(uiState.scenario.dryDays);
+  $('dryDaysOutput').textContent = `${uiState.scenario.dryDays} days`;
+  $('rainSelect').value = String(uiState.scenario.rainfall);
+  $('regionSelect').value = uiState.scenario.region;
+  $('riskFilter').value = uiState.filters.risk;
+}
+
+function bindEvents() {
+  $('dryDays').oninput = (event) => {
+    uiState.scenario.dryDays = Number(event.target.value);
+    $('dryDaysOutput').textContent = `${uiState.scenario.dryDays} days`;
+    persistUiState();
+    loadLocations();
+  };
+
+  $('rainSelect').onchange = (event) => {
+    uiState.scenario.rainfall = Number(event.target.value);
+    persistUiState();
+    loadLocations();
+  };
+
+  $('regionSelect').onchange = (event) => {
+    uiState.scenario.region = event.target.value;
+    uiState.filters.state = 'all';
+    uiState.filters.city = 'all';
+    persistUiState();
+    loadLocations();
+  };
+
+  $('stateFilter').onchange = (event) => {
+    uiState.filters.state = event.target.value;
+    persistUiState();
+    loadLocations();
+  };
+
+  $('cityFilter').onchange = (event) => {
+    uiState.filters.city = event.target.value;
+    persistUiState();
+    loadLocations();
+  };
+
+  $('riskFilter').onchange = (event) => {
+    uiState.filters.risk = event.target.value;
+    persistUiState();
+    loadLocations();
+  };
+
+  $('runScenario').onclick = () => {
+    toast('Risk assessment run with current scenario.');
+    document.querySelector('#priorities').scrollIntoView({ behavior: 'smooth' });
+    loadLocations();
+  };
+
+  $('resetButton').onclick = resetScenario;
+  $('openTopPriority').onclick = () => appState.topLocationId && openDetail(appState.topLocationId);
+  $('observationButton').onclick = () => $('observationDialog').showModal();
+  $('dialogAction').onclick = recordAction;
+  $('observationForm').onsubmit = submitObservation;
+  $('reportButton').onclick = exportCsv;
+  $('printReportButton').onclick = printReport;
+  $('howItWorks').onclick = () => $('methodDialog').showModal();
+  $('helpButton').onclick = () => $('methodDialog').showModal();
+
+  document.querySelectorAll('[data-close]').forEach((button) => {
+    button.onclick = () => $(button.dataset.close).close();
+  });
+
+  document.querySelectorAll('.view-toggle button').forEach((button) => {
+    button.onclick = () => {
+      document.querySelectorAll('.view-toggle button').forEach((item) => item.classList.remove('active'));
+      button.classList.add('active');
+      document.body.classList.toggle('list-view', button.dataset.view === 'list');
+    };
+  });
+}
+
+async function bootstrap() {
+  applyStateToControls();
+  bindEvents();
+  await loadHealth();
+  await loadLocations();
+}
+
+bootstrap();

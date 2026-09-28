@@ -1,0 +1,70 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: FirstFlush India API
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Timeout: 15
+    MemorySize: 256
+
+Resources:
+  FirstFlushApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+
+  FirstFlushFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: server/lambda.handler
+      Events:
+        ApiProxy:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref FirstFlushApi
+            Path: /{proxy+}
+            Method: ANY
+      Environment:
+        Variables:
+          AWS_REGION: !Ref AWS::Region
+          DDB_APP_TABLE: !Ref FirstFlushDataTable
+          S3_UPLOAD_BUCKET: !Ref FirstFlushUploadsBucket
+          WEATHER_PROVIDER_MODE: open-meteo
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref FirstFlushDataTable
+        - S3CrudPolicy:
+            BucketName: !Ref FirstFlushUploadsBucket
+
+  FirstFlushDataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+
+  FirstFlushUploadsBucket:
+    Type: AWS::S3::Bucket
+
+Outputs:
+  ApiBaseUrl:
+    Value: !Sub 'https://${FirstFlushApi}.execute-api.${AWS::Region}.amazonaws.com'

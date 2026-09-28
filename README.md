@@ -1,121 +1,182 @@
 # FirstFlush India
 
-**Act before polluted runoff reaches India's waters.**
+**Pre-rain runoff risk prioritization for India (dynamic full-stack app).**
 
-FirstFlush India is a deployable environmental decision-support MVP for prioritizing drainage points before polluted first-flush stormwater reaches lakes, rivers, and recharge areas. It is designed for the Environmental Hacks / Bharat Builds Tour hackathon (October 8–11, 2026).
+FirstFlush India helps civic teams prioritize which drain/outfall to inspect or protect before rainfall.  
+It provides **estimated relative risk** for prioritization and **does not claim lab-measured pollution concentrations**.
 
-## What problem it addresses
+---
 
-After dry periods, the first rain can wash accumulated road dust, oil residue, tyre/brake particles, construction material, animal waste, and litter into storm drains. Local teams often have limited time and no ranked, explainable way to decide which locations to inspect, clean, protect, or sample first.
+## What is implemented
 
-FirstFlush does **not** claim to measure toxicity or replace laboratory water testing. It provides a transparent **relative prioritization estimate** from visible factors and recorded observations.
+- Dynamic API-backed dashboard (no hard-coded frontend state)
+- Region/state/city/risk/scenario filtering via API
+- Shared risk domain logic (`shared/risk.js`) used by frontend + backend
+- Location detail with factors, confidence, provenance, and timeline history
+- Observation intake API with validation (`multipart/form-data`, optional image)
+- Action logging API with persistence and audit timeline
+- CSV export endpoint + print-friendly frontend report
+- Weather adapter:
+  - Live: Open-Meteo (no key)
+  - Fallback: explicit mode + source + timestamp
+- Health endpoint exposing provider modes and freshness
+- Persistence adapters:
+  - Local JSON fallback (default, no credentials)
+  - DynamoDB adapter (when env configured)
+- File adapters:
+  - Local uploads folder fallback
+  - S3 adapter (when env configured)
+- Interactive map using Leaflet + OpenStreetMap tiles with fallback message
+- Loading/error/retry UX, toasts, and responsive UI
+- Tests for risk, filters, validation/API, action persistence, frontend smoke
+- AWS SAM template for API Gateway + Lambda + DynamoDB + S3
+- Amplify frontend build config
 
-## Current MVP
+---
 
-- India-wide styled overview with transparent fallback records across states
-- Region and state filtering
-- Adjustable dry spell and rainfall scenarios
-- Explainable risk score and factor breakdown
-- Interactive risk map visualization
-- Priority queue with action recommendations
-- Location detail drawer with confidence and provenance
-- Field observation intake with pending-verification status
-- Intervention recording
-- CSV priority-report export
-- Methodology and limitations disclosure
-- Responsive, accessible UI with mobile layout
-- No API keys required for the fallback deployment
+## Project structure
 
-## Run locally
+- `index.html`, `styles.css`, `app.js` — frontend UI
+- `shared/` — shared domain logic (risk + filters)
+- `server/app.js` — Express API
+- `server/lambda.js` — Lambda handler for API Gateway
+- `server/adapters/` — persistence/storage/weather adapters
+- `data/seed-locations.json` — labelled fallback seed records
+- `data/local-db.json` — local persistence store
+- `scripts/reset-data.js` — reset local data from seed
+- `template.yaml` — AWS SAM deployment template for API
 
-This is a zero-build static site:
+---
+
+## Local run (no AWS credentials required)
 
 ```bash
-python3 -m http.server 4173
+npm install
+npm run reset-data
+npm run dev
 ```
 
-Open `http://localhost:4173`.
+- Frontend: `http://localhost:4173`
+- API: `http://localhost:8787`
 
-Alternatively open `index.html` directly in a browser. A modern browser is recommended.
+Single-server mode:
 
-## AWS Amplify deployment
-
-1. Push this repository to GitHub.
-2. In AWS Amplify Hosting, choose **Deploy without Git** or connect the repository.
-3. Use the repository root as the app root.
-4. The included `amplify.yml` uses the static `index.html` directly.
-5. No environment variables are required for fallback mode.
-
-Optional future integrations are documented below; the public MVP intentionally works without credentials.
-
-## Risk model
-
-The score is a transparent relative estimate:
-
-- Dry-period accumulation: 25%
-- Rainfall intensity: 20%
-- Paved/catchment exposure: 15%
-- Traffic exposure: 15%
-- Construction proximity: 10%
-- Waste/animal activity: 10%
-- Connected water-body sensitivity: 5%
-
-Data confidence is shown separately. Confidence reflects observation completeness, freshness, verification state, and source type. A high risk score with low confidence should be treated as a request for field verification, not as a fact.
-
-## Data honesty
-
-The current records are clearly labelled as fallback/seeded records so the website remains usable without live APIs. They are not presented as official municipal measurements. To add real observations, use the in-app field observation form; production should store verified submissions in DynamoDB/S3 and attach source metadata.
-
-Suggested real observation schema:
-
-```text
-drain_id, latitude, longitude, city, state, connected_water_body,
-observation_date, blockage_level, litter_level, traffic_exposure,
-construction_nearby, catchment_type, photo_url, source, verification_status
+```bash
+npm run start
 ```
 
-## Suggested production architecture
+Then open `http://localhost:8787`.
 
-- AWS Amplify Hosting: frontend deployment
-- API Gateway + Lambda: risk calculation and observations API
-- DynamoDB: locations, observations, actions, provenance
-- S3: field photos and generated reports
-- EventBridge: forecast refresh / rain threshold trigger
-- SNS: optional operational notifications
-- CloudWatch: monitoring and audit logs
-- Weather-provider adapter: IMD or another approved provider, with fallback mode
-- OpenStreetMap-compatible map layer or a licensed national geospatial provider
+---
 
-## Three-minute demo flow
+## Scripts
 
-1. Open FirstFlush India and explain the first-flush problem.
-2. Set **18 days** dry spell and **Heavy · 62 mm** rainfall.
-3. Click **Run risk assessment**.
-4. Open the top priority and show the visible factor breakdown and confidence.
-5. Record the location as protected.
-6. Add a field observation and show its pending-verification label.
-7. Export the priority CSV report.
-8. State the limitation: the score prioritizes action; it is not a lab result.
+- `npm run dev` — Vite frontend + nodemon API
+- `npm run start` — API server (also serves frontend files)
+- `npm run build` — frontend production build (`dist/`)
+- `npm run test` — vitest suite
+- `npm run lint` — eslint
+- `npm run typecheck` — TypeScript no-emit check
+- `npm run reset-data` — reset local JSON and reload seed records
 
-## Design principles
+---
 
-- Make the next environmental action obvious.
-- Explain every estimate.
-- Distinguish official data, field observations, fallback data, and model estimates.
-- Avoid unsupported pollution multipliers and exact pollutant-mass claims.
-- Prefer a small verified pilot over pretending to have complete national drain coverage.
+## Environment variables
 
-## Future work
+See `.env.example`.
 
-- Verified national observation onboarding
-- Official rainfall provider integration
-- GIS catchment import and river/water-body boundaries
-- Photo evidence and verification workflow
-- Real intervention outcome tracking
-- Laboratory sample result ingestion
-- Calibrated model trained on Indian runoff observations
-- Role-based access for civic teams and NGOs
+### Local fallback mode (default)
+Leave AWS variables unset to use local JSON + local uploads.
 
-## License
+### AWS mode
+Set:
 
-Add the license chosen by the team before public production use.
+- `AWS_REGION`
+- `DDB_APP_TABLE`
+- `S3_UPLOAD_BUCKET`
+- optional `S3_UPLOAD_PREFIX`
+
+Weather:
+
+- `WEATHER_PROVIDER_MODE=open-meteo` (default)
+- `WEATHER_PROVIDER_MODE=fallback` to force fallback
+
+---
+
+## API endpoints
+
+- `GET /api/health`
+- `GET /api/locations?region=&state=&city=&risk=&dryDays=&rainfall=`
+- `GET /api/locations/:id`
+- `GET /api/locations/:id/history`
+- `POST /api/observations` (`multipart/form-data`, optional `photo`)
+- `POST /api/locations/:id/actions`
+- `GET /api/weather?lat=&lon=`
+- `GET /api/reports/priority.csv?...`
+- `POST /api/dev/reset` (local reset helper)
+
+### Example request
+
+```bash
+curl "http://localhost:8787/api/locations?region=South%20India&dryDays=18&rainfall=62"
+```
+
+---
+
+## AWS deployment
+
+### Frontend (Amplify Hosting)
+
+1. Connect repository in Amplify.
+2. Amplify uses `amplify.yml`:
+   - `npm ci`
+   - `npm run build`
+   - publish `dist/`
+3. Set frontend environment variable (if needed) for API base URL strategy in your hosting setup.
+
+### Backend (API Gateway + Lambda + DynamoDB + S3)
+
+Deploy `template.yaml` with SAM:
+
+```bash
+sam build
+sam deploy --guided
+```
+
+Creates:
+
+- HTTP API Gateway
+- Lambda (`server/lambda.handler`)
+- DynamoDB table (`pk`, `sk`)
+- S3 bucket for image evidence
+
+### IAM permissions
+
+Lambda role requires:
+
+- DynamoDB CRUD on app table
+- S3 Put/Get/Delete on uploads bucket
+
+(Already attached in `template.yaml` policies.)
+
+---
+
+## Data honesty and limitations
+
+- Risk score is an **estimate for prioritization**, not a toxicity or lab measurement.
+- Seed records are explicitly marked fallback and are not official municipal records.
+- India coverage is incomplete until verified field/official datasets are added.
+- Weather endpoint includes source/timestamp and fallback mode when live data is unavailable.
+
+---
+
+## Hackathon demo walkthrough (3 minutes)
+
+1. Open dashboard, show mode badge from `/api/health`.
+2. Change dry days + rainfall scenario.
+3. Show priority list re-ranking from API response.
+4. Open top location detail and explain factors/provenance/confidence.
+5. Record action and show updated timeline.
+6. Add field observation (with optional photo) and show pending verification.
+7. Export CSV report and print summary.
+8. State limitation clearly: prioritization estimate, not lab measurement.
