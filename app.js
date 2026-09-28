@@ -29,6 +29,15 @@ function titleCase(value) {
   return String(value || '').replaceAll('-', ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
 function toast(message) {
   const element = $('toast');
   element.textContent = message;
@@ -40,7 +49,7 @@ function toast(message) {
 function setStatus(message, isError = false, retryAction = null) {
   const banner = $('statusBanner');
   banner.classList.toggle('error', isError);
-  banner.innerHTML = message;
+  banner.textContent = message;
   if (retryAction) {
     const retryButton = document.createElement('button');
     retryButton.type = 'button';
@@ -100,13 +109,13 @@ function updateTopPriority(list) {
     ['Rain forecast', `${uiState.scenario.rainfall} mm`],
     ['Paved catchment', `${top.factors.catchment}/100`],
     ['Traffic exposure', `${top.factors.traffic}/100`]
-  ].map(([name, value]) => `<div class="reason"><span>${name}</span><b>${value}</b></div>`).join('');
+  ].map(([name, value]) => `<div class="reason"><span>${escapeHtml(name)}</span><b>${escapeHtml(value)}</b></div>`).join('');
 }
 
 function renderQueue(list) {
   $('queueList').innerHTML = list.map((location) => {
     const severity = riskLevel(location.score);
-    return `<div class="queue-item"><div><h3>${location.name}</h3><p>${location.city}, ${location.state} · ${location.waterBody}</p></div><div class="queue-score"><span class="severity ${severity}">${location.score}</span><small>${location.confidence}% confidence</small></div><div class="queue-action">${location.status === 'protected' ? 'Protected' : 'Pending'}<br><span>${location.provenance.recordType}</span></div><button aria-label="Inspect ${location.name}" onclick="window.openDetail('${location.id}')">Inspect</button></div>`;
+    return `<div class="queue-item"><div><h3>${escapeHtml(location.name)}</h3><p>${escapeHtml(location.city)}, ${escapeHtml(location.state)} · ${escapeHtml(location.waterBody)}</p></div><div class="queue-score"><span class="severity ${severity}">${escapeHtml(location.score)}</span><small>${escapeHtml(location.confidence)}% confidence</small></div><div class="queue-action">${location.status === 'protected' ? 'Protected' : 'Pending'}<br><span>${escapeHtml(location.provenance.recordType)}</span></div><button aria-label="Inspect ${escapeHtml(location.name)}" onclick="window.openDetail('${escapeHtml(location.id)}')">Inspect</button></div>`;
   }).join('') || '<p class="disclaimer">No locations match this filter.</p>';
 }
 
@@ -235,10 +244,10 @@ function makeHistoryHtml(items) {
   if (!items.length) return '<p class="disclaimer">No history yet for this location.</p>';
   return `<div class="history-list">${items.map((item) => {
     if (item.type === 'action') {
-      return `<div class="history-item"><b>Action · ${item.actionType}</b><small>${new Date(item.createdAt).toLocaleString('en-IN')} · ${item.notes || 'No notes'}</small></div>`;
+      return `<div class="history-item"><b>Action · ${escapeHtml(item.actionType)}</b><small>${escapeHtml(new Date(item.createdAt).toLocaleString('en-IN'))} · ${escapeHtml(item.notes || 'No notes')}</small></div>`;
     }
-    const evidence = item.evidence ? ` · Evidence: ${item.evidence.originalName} (${item.evidence.provider})` : '';
-    return `<div class="history-item"><b>Observation · ${item.condition}</b><small>${new Date(item.createdAt).toLocaleString('en-IN')} · ${item.verificationStatus}${evidence}</small></div>`;
+    const evidence = item.evidence ? ` · Evidence: ${escapeHtml(item.evidence.originalName)} (${escapeHtml(item.evidence.provider)})` : '';
+    return `<div class="history-item"><b>Observation · ${escapeHtml(item.condition)}</b><small>${escapeHtml(new Date(item.createdAt).toLocaleString('en-IN'))} · ${escapeHtml(item.verificationStatus)}${evidence}</small></div>`;
   }).join('')}</div>`;
 }
 
@@ -249,7 +258,7 @@ async function openDetail(id) {
     appState.currentDetail = details;
 
     $('dialogTitle').textContent = details.name;
-    $('dialogBody').innerHTML = `<div class="detail-meta"><div><small>Relative risk</small><b>${details.score}/100 · ${titleCase(details.level)}</b></div><div><small>Connected water body</small><b>${details.waterBody}</b></div><div><small>Confidence</small><b>${details.confidence}%</b></div><div><small>Provenance</small><b>${details.provenance.sourceLabel}</b></div></div><p class="warning-box">${details.provenance.note}</p><h3>Factor breakdown</h3><div class="detail-factors">${Object.entries(details.factors).map(([name, value]) => `<div class="factor-row"><span>${titleCase(name)}</span><div class="factor-bar"><span style="width:${Math.min(100, Number(value))}%"></span></div><b>${Math.round(Number(value))}</b></div>`).join('')}</div><div class="action-editor"><label>Recommended field action<select id="detailAction">${ACTIONS.map((action) => `<option ${details.actions?.[0]?.actionType === action ? 'selected' : ''}>${action}</option>`).join('')}</select></label><label>Action note<textarea id="actionNote" rows="2" placeholder="What was observed or done?"></textarea></label></div><h3>Audit timeline</h3>${makeHistoryHtml(history.items)}`;
+    $('dialogBody').innerHTML = `<div class="detail-meta"><div><small>Relative risk</small><b>${escapeHtml(details.score)}/100 · ${escapeHtml(titleCase(details.level))}</b></div><div><small>Connected water body</small><b>${escapeHtml(details.waterBody)}</b></div><div><small>Confidence</small><b>${escapeHtml(details.confidence)}%</b></div><div><small>Provenance</small><b>${escapeHtml(details.provenance.sourceLabel)}</b></div></div><p class="warning-box">${escapeHtml(details.provenance.note)}</p><h3>Factor breakdown</h3><div class="detail-factors">${Object.entries(details.factors).map(([name, value]) => `<div class="factor-row"><span>${escapeHtml(titleCase(name))}</span><div class="factor-bar"><span style="width:${Math.min(100, Number(value))}%"></span></div><b>${escapeHtml(Math.round(Number(value)))}</b></div>`).join('')}</div><div class="action-editor"><label>Recommended field action<select id="detailAction">${ACTIONS.map((action) => `<option ${details.actions?.[0]?.actionType === action ? 'selected' : ''}>${escapeHtml(action)}</option>`).join('')}</select></label><label>Action note<textarea id="actionNote" rows="2" placeholder="What was observed or done?"></textarea></label></div><h3>Audit timeline</h3>${makeHistoryHtml(history.items)}`;
     $('dialogAction').textContent = 'Record action →';
     $('detailDialog').showModal();
   } catch (error) {
@@ -305,13 +314,13 @@ function exportCsv() {
 }
 
 function printReport() {
-  const rows = appState.locations.map((item) => `<tr><td>${item.id}</td><td>${item.name}</td><td>${item.state}</td><td>${item.city}</td><td>${item.score}/100</td><td>${titleCase(item.level)}</td><td>${item.confidence}%</td><td>${item.status}</td></tr>`).join('');
+  const rows = appState.locations.map((item) => `<tr><td>${escapeHtml(item.id)}</td><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.state)}</td><td>${escapeHtml(item.city)}</td><td>${escapeHtml(item.score)}/100</td><td>${escapeHtml(titleCase(item.level))}</td><td>${escapeHtml(item.confidence)}%</td><td>${escapeHtml(item.status)}</td></tr>`).join('');
   const report = window.open('', '_blank', 'width=1000,height=700');
   if (!report) {
     toast('Allow pop-ups to print the report.');
     return;
   }
-  report.document.write(`<!doctype html><title>FirstFlush India report</title><style>body{font:14px Arial;color:#102326;padding:36px}table{border-collapse:collapse;width:100%;margin-top:18px}th,td{border:1px solid #dce6e1;padding:8px;text-align:left}th{background:#eef6f3}.note{margin-top:16px;background:#fff8e9;padding:12px}</style><h1>FirstFlush India priority report</h1><p>Scenario: ${uiState.scenario.dryDays} dry days; ${uiState.scenario.rainfall} mm rainfall; ${uiState.scenario.region}</p><table><thead><tr><th>ID</th><th>Location</th><th>State</th><th>City</th><th>Risk</th><th>Level</th><th>Confidence</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table><p class="note">Estimated relative risk for prioritization. Not a laboratory water-quality measurement.</p><script>window.onload=()=>window.print()<\/script>`);
+  report.document.write(`<!doctype html><title>FirstFlush India report</title><style>body{font:14px Arial;color:#102326;padding:36px}table{border-collapse:collapse;width:100%;margin-top:18px}th,td{border:1px solid #dce6e1;padding:8px;text-align:left}th{background:#eef6f3}.note{margin-top:16px;background:#fff8e9;padding:12px}</style><h1>FirstFlush India priority report</h1><p>Scenario: ${escapeHtml(uiState.scenario.dryDays)} dry days; ${escapeHtml(uiState.scenario.rainfall)} mm rainfall; ${escapeHtml(uiState.scenario.region)}</p><table><thead><tr><th>ID</th><th>Location</th><th>State</th><th>City</th><th>Risk</th><th>Level</th><th>Confidence</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table><p class="note">Estimated relative risk for prioritization. Not a laboratory water-quality measurement.</p><script>window.onload=()=>window.print()<\/script>`);
   report.document.close();
 }
 

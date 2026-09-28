@@ -19,6 +19,9 @@ const projectRoot = path.resolve(__dirname, '..');
 const persistence = canUseDynamo() ? createDynamoPersistenceAdapter() : createLocalPersistenceAdapter();
 const storage = canUseS3() ? createS3StorageAdapter() : createLocalStorageAdapter();
 const weather = createWeatherAdapter();
+const requestWindowMs = 60 * 1000;
+const requestLimit = 30;
+const rateBucket = new Map();
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -60,9 +63,36 @@ function csvEscape(value) {
 export function createApp() {
   const app = express();
   app.disable('x-powered-by');
-  app.use(cors({ origin: process.env.CORS_ORIGIN || true }));
+  const allowList = (process.env.CORS_ORIGIN || 'http://localhost:4173,http://localhost:8787')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  app.use(cors({
+    origin(origin, callback) {
+      if (!origin || allowList.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error('Origin not allowed by CORS'));
+    }
+  }));
   app.use(express.json({ limit: '512kb' }));
   app.use('/uploads', express.static(path.join(projectRoot, 'uploads')));
+
+  const writeRateLimit = (req, res, next) => {
+    const key = `${req.ip}:${req.path}`;
+    const now = Date.now();
+    const bucket = rateBucket.get(key) || [];
+    const recent = bucket.filter((item) => now - item < requestWindowMs);
+    if (recent.length >= requestLimit) {
+      res.status(429).json({ error: 'Too many requests. Please retry shortly.' });
+      return;
+    }
+    recent.push(now);
+    rateBucket.set(key, recent);
+    next();
+  };
 
   app.get('/api/health', async (_req, res, next) => {
     try {
@@ -133,7 +163,7 @@ export function createApp() {
     }
   });
 
-  app.post('/api/observations', upload.single('photo'), async (req, res, next) => {
+  app.post('/api/observations', writeRateLimit, upload.single('photo'), async (req, res, next) => {
     try {
       const validation = validateObservationInput(req.body);
       const uploadValidation = validateUpload(req.file);
@@ -198,7 +228,7 @@ export function createApp() {
     }
   });
 
-  app.post('/api/locations/:id/actions', async (req, res, next) => {
+  app.post('/api/locations/:id/actions', writeRateLimit, async (req, res, next) => {
     try {
       const validation = validateActionInput(req.body || {});
       if (!validation.valid) {
@@ -285,7 +315,7 @@ export function createApp() {
     }
   });
 
-  app.post('/api/dev/reset', async (_req, res, next) => {
+  app.post('/api/dev/reset', writeRateLimit, async (_req, res, next) => {
     try {
       const data = await persistence.reset();
       res.json({ message: 'Local data reset', mode: persistence.mode, locations: data.locations.length });
@@ -295,13 +325,14 @@ export function createApp() {
   });
 
   app.use(express.static(projectRoot));
-  app.get('*', (_req, res) => {
+  app.get('*', writeRateLimit, (_req, res) => {
     res.sendFile(path.join(projectRoot, 'index.html'));
   });
 
   app.use((err, _req, res, _next) => {
     const message = err instanceof Error ? err.message : 'Unknown server error';
-    res.status(500).json({ error: 'Internal server error', message });
+    const status = message.includes('CORS') ? 403 : 500;
+    res.status(status).json({ error: status === 403 ? 'CORS blocked origin' : 'Internal server error', message });
   });
 
   return app;
