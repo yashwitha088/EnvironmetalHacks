@@ -1,0 +1,1 @@
+import {defineConfig} from 'eslint/config';export default defineConfig([{ignores:['dist/**','uploads/**','data/**']},{files:['**/*.js','**/*.mjs'],rules:{'no-undef':'error','no-unused-vars':['warn',{args:'none'}],'no-console':'off'}}]);
