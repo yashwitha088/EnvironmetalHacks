@@ -1,121 +1,58 @@
-# FirstFlush India
+# FirstFlush India — dynamic build
 
-**Act before polluted runoff reaches India's waters.**
-
-FirstFlush India is a deployable environmental decision-support MVP for prioritizing drainage points before polluted first-flush stormwater reaches lakes, rivers, and recharge areas. It is designed for the Environmental Hacks / Bharat Builds Tour hackathon (October 8–11, 2026).
-
-## What problem it addresses
-
-After dry periods, the first rain can wash accumulated road dust, oil residue, tyre/brake particles, construction material, animal waste, and litter into storm drains. Local teams often have limited time and no ranked, explainable way to decide which locations to inspect, clean, protect, or sample first.
-
-FirstFlush does **not** claim to measure toxicity or replace laboratory water testing. It provides a transparent **relative prioritization estimate** from visible factors and recorded observations.
-
-## Current MVP
-
-- India-wide styled overview with transparent fallback records across states
-- Region and state filtering
-- Adjustable dry spell and rainfall scenarios
-- Explainable risk score and factor breakdown
-- Interactive risk map visualization
-- Priority queue with action recommendations
-- Location detail drawer with confidence and provenance
-- Field observation intake with pending-verification status
-- Intervention recording
-- CSV priority-report export
-- Methodology and limitations disclosure
-- Responsive, accessible UI with mobile layout
-- No API keys required for the fallback deployment
-
-## Run locally
-
-This is a zero-build static site:
+## Run the working application
 
 ```bash
-python3 -m http.server 4173
+npm install
+npm start
 ```
 
-Open `http://localhost:4173`.
+Open `http://localhost:8787`. This runs the browser UI and API from the same server. Data is persisted in `data/runtime.json`; uploads are stored in `uploads/` during local development.
 
-Alternatively open `index.html` directly in a browser. A modern browser is recommended.
+## Dynamic features
 
-## AWS Amplify deployment
+- API-backed locations and rankings (`GET /api/locations`)
+- Scenario-aware risk recalculation
+- Persistent field observations and action history
+- Validated image uploads up to 5 MB
+- Live Open-Meteo weather when reachable, explicitly labelled fallback otherwise
+- Health/status endpoint
+- Polling refresh every 20 seconds for dashboard/weather status
+- FirstFlush Copilot at `POST /api/chat` with deterministic local fallback
+- CSV export from the API
+- Print-friendly reports in the browser
+- Reset local data with `curl -X POST http://localhost:8787/api/dev/reset`
 
-1. Push this repository to GitHub.
-2. In AWS Amplify Hosting, choose **Deploy without Git** or connect the repository.
-3. Use the repository root as the app root.
-4. The included `amplify.yml` uses the static `index.html` directly.
-5. No environment variables are required for fallback mode.
+## FirstFlush Copilot
 
-Optional future integrations are documented below; the public MVP intentionally works without credentials.
-
-## Risk model
-
-The score is a transparent relative estimate:
-
-- Dry-period accumulation: 25%
-- Rainfall intensity: 20%
-- Paved/catchment exposure: 15%
-- Traffic exposure: 15%
-- Construction proximity: 10%
-- Waste/animal activity: 10%
-- Connected water-body sensitivity: 5%
-
-Data confidence is shown separately. Confidence reflects observation completeness, freshness, verification state, and source type. A high risk score with low confidence should be treated as a request for field verification, not as a fact.
+The local assistant explains current prioritization records and refuses to present estimates as lab measurements. It runs without an API key. For a production AI provider, add a server-side adapter behind `AI_PROVIDER`; never place credentials in frontend code.
 
 ## Data honesty
 
-The current records are clearly labelled as fallback/seeded records so the website remains usable without live APIs. They are not presented as official municipal measurements. To add real observations, use the in-app field observation form; production should store verified submissions in DynamoDB/S3 and attach source metadata.
+Seed records are fallback records, not official nationwide drain measurements. User submissions are pending verification. Weather responses expose `mode`, `source`, and `updatedAt`. Risk is a relative prioritization estimate, not a toxicity or pollutant-mass measurement.
 
-Suggested real observation schema:
+## API examples
 
-```text
-drain_id, latitude, longitude, city, state, connected_water_body,
-observation_date, blockage_level, litter_level, traffic_exposure,
-construction_nearby, catchment_type, photo_url, source, verification_status
+```bash
+curl http://localhost:8787/api/health
+curl 'http://localhost:8787/api/locations?region=All%20India&dryDays=18&rainfall=heavy'
+curl -X POST http://localhost:8787/api/chat -H 'content-type: application/json' -d '{"message":"Why is the top location risky?"}'
 ```
 
-## Suggested production architecture
+## AWS path
 
-- AWS Amplify Hosting: frontend deployment
-- API Gateway + Lambda: risk calculation and observations API
-- DynamoDB: locations, observations, actions, provenance
-- S3: field photos and generated reports
-- EventBridge: forecast refresh / rain threshold trigger
-- SNS: optional operational notifications
-- CloudWatch: monitoring and audit logs
-- Weather-provider adapter: IMD or another approved provider, with fallback mode
-- OpenStreetMap-compatible map layer or a licensed national geospatial provider
+The current implementation is production-structured and local-complete. For AWS, deploy the frontend with Amplify Hosting and move `server/app.js` behind API Gateway/Lambda, `data/runtime.json` to DynamoDB, and `uploads/` to S3. Set `CORS_ORIGIN`, `DATA_FILE`/adapter settings, weather provider credentials if required, and AI provider credentials only as server-side environment variables. Do not claim national live coverage until verified datasets are connected.
 
-## Three-minute demo flow
+## Three-minute demo
 
-1. Open FirstFlush India and explain the first-flush problem.
-2. Set **18 days** dry spell and **Heavy · 62 mm** rainfall.
-3. Click **Run risk assessment**.
-4. Open the top priority and show the visible factor breakdown and confidence.
-5. Record the location as protected.
-6. Add a field observation and show its pending-verification label.
-7. Export the priority CSV report.
-8. State the limitation: the score prioritizes action; it is not a lab result.
+1. Open the dashboard and show the status badges.
+2. Change dry days/rainfall; rankings update through the API.
+3. Open a location and record a field action.
+4. Add an observation with an image.
+5. Ask FirstFlush Copilot why the top location is risky.
+6. Wait for the live refresh indicator or click refresh.
+7. Download the current priority CSV.
 
-## Design principles
+## Limitations
 
-- Make the next environmental action obvious.
-- Explain every estimate.
-- Distinguish official data, field observations, fallback data, and model estimates.
-- Avoid unsupported pollution multipliers and exact pollutant-mass claims.
-- Prefer a small verified pilot over pretending to have complete national drain coverage.
-
-## Future work
-
-- Verified national observation onboarding
-- Official rainfall provider integration
-- GIS catchment import and river/water-body boundaries
-- Photo evidence and verification workflow
-- Real intervention outcome tracking
-- Laboratory sample result ingestion
-- Calibrated model trained on Indian runoff observations
-- Role-based access for civic teams and NGOs
-
-## License
-
-Add the license chosen by the team before public production use.
+This repository provides a complete working local dynamic application. Nationwide official drain coverage, authenticated multi-user roles, DynamoDB/S3 adapters, and calibrated laboratory validation remain integration steps requiring approved data, cloud credentials, and operational ownership.

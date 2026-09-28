@@ -1,0 +1,3 @@
+import {describe,it,expect} from 'vitest';
+import {riskScore,riskLevel} from '../server/risk.js';
+describe('risk model',()=>{it('returns high risk for exposed catchment',()=>{const score=riskScore({base:79,catchment:88,traffic:82,construction:73,waste:61},{dryDays:18,rainfall:'heavy'});expect(score).toBeGreaterThan(70);expect(riskLevel(score)).toMatch(/high/);});it('responds to dry spell',()=>{const location={base:50,catchment:50,traffic:50,construction:50,waste:50};expect(riskScore(location,{dryDays:20,rainfall:'heavy'})).toBeGreaterThan(riskScore(location,{dryDays:2,rainfall:'light'}));});});
