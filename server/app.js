@@ -270,7 +270,7 @@ app.post('/api/dev/reset', limit, async (_req, res) => {
   res.json({ok: true});
 });
 
-app.get('*', (_req, res) => res.sendFile(path.join(root, 'index.html')));
+app.use((_req, res) => res.status(404).json({error: 'Not found'}));
 
 const isDirectRun = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isDirectRun) {

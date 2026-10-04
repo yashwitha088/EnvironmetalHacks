@@ -24,6 +24,15 @@ const ui = {
   }
 };
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
 function loadScenario() {
   try {
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
@@ -140,7 +149,7 @@ function renderMap(items) {
       title: `${item.name} (${item.score})`
     });
 
-    marker.bindPopup(`<strong>${item.name}</strong><br>${item.city}, ${item.state}<br>Risk: ${item.score}/100 (${item.level})<br><button class="map-popup-open" data-open-id="${item.id}">Open details</button>`);
+    marker.bindPopup(`<strong>${escapeHtml(item.name)}</strong><br>${escapeHtml(item.city)}, ${escapeHtml(item.state)}<br>Risk: ${escapeHtml(item.score)}/100 (${escapeHtml(item.level)})<br><button class="map-popup-open" data-open-id="${escapeHtml(item.id)}">Open details</button>`);
 
     marker.on('click', () => {
       ui.current = item;
@@ -168,7 +177,7 @@ function renderMapFallbackList(items) {
   }
 
   const buttons = items
-    .map((item) => `<button class="fallback-item" data-open-id="${item.id}">${item.name} · ${item.city} (${item.score})</button>`)
+    .map((item) => `<button class="fallback-item" data-open-id="${escapeHtml(item.id)}">${escapeHtml(item.name)} · ${escapeHtml(item.city)} (${escapeHtml(item.score)})</button>`)
     .join('');
 
   fallback.hidden = false;
@@ -197,12 +206,12 @@ function renderQueue(items) {
   queue.innerHTML = items.map((item) => `
     <div class="queue-item">
       <div>
-        <h3>${item.name}</h3>
-        <p>${item.city}, ${item.state} · ${item.waterBody}</p>
+        <h3>${escapeHtml(item.name)}</h3>
+        <p>${escapeHtml(item.city)}, ${escapeHtml(item.state)} · ${escapeHtml(item.waterBody)}</p>
       </div>
-      <div class="queue-score"><b>${item.score}</b><small>${item.level}</small></div>
-      <div class="queue-action">${item.recommendedAction || 'Inspect'}<br><small>${item.status || 'Pending'}</small></div>
-      <button data-open-id="${item.id}">Inspect</button>
+      <div class="queue-score"><b>${escapeHtml(item.score)}</b><small>${escapeHtml(item.level)}</small></div>
+      <div class="queue-action">${escapeHtml(item.recommendedAction || 'Inspect')}<br><small>${escapeHtml(item.status || 'Pending')}</small></div>
+      <button data-open-id="${escapeHtml(item.id)}">Inspect</button>
     </div>
   `).join('');
 }
@@ -230,12 +239,22 @@ function renderDashboard(items, stats) {
   $('topName').textContent = top.name;
   $('topScore').textContent = String(top.score);
   $('topSummary').textContent = `${top.city}, ${top.state} · connected to ${top.waterBody}. ${top.provenance?.note || 'Estimate uses current scenario factors.'}`;
-  $('topReasons').innerHTML = [
+  const reasons = [
     ['Dry spell', `${ui.scenario.dryDays} days`],
     ['Rainfall', `${RAINFALL_MM[ui.scenario.rainfall]} mm`],
     ['Catchment', `${top.catchment}/100`],
     ['Traffic', `${top.traffic}/100`]
-  ].map(([label, value]) => `<div class="reason"><span>${label}</span><b>${value}</b></div>`).join('');
+  ];
+  $('topReasons').replaceChildren(...reasons.map(([label, value]) => {
+    const container = document.createElement('div');
+    const span = document.createElement('span');
+    const strong = document.createElement('b');
+    container.className = 'reason';
+    span.textContent = label;
+    strong.textContent = value;
+    container.append(span, strong);
+    return container;
+  }));
 
   $('topOpen').onclick = () => openDetail(top.id);
   $('coverage').textContent = `${items.length} monitored · source: API`;
@@ -307,7 +326,7 @@ function renderObservationHistory(observations = []) {
 
   return observations.map((observation) => `
     <div class="history-item">
-      <b>${observation.condition}</b>
+      <b>${escapeHtml(observation.condition)}</b>
       <small>${new Date(observation.createdAt).toLocaleString('en-IN')}</small>
     </div>
   `).join('');
@@ -323,15 +342,15 @@ async function openDetail(id) {
       <div class="detail-meta">
         <div><small>Relative risk</small><b>${detail.score}/100 · ${detail.level}</b></div>
         <div><small>Confidence</small><b>${detail.confidence}%</b></div>
-        <div><small>Water body</small><b>${detail.waterBody}</b></div>
-        <div><small>Provenance</small><b>${detail.source}</b></div>
+        <div><small>Water body</small><b>${escapeHtml(detail.waterBody)}</b></div>
+        <div><small>Provenance</small><b>${escapeHtml(detail.source)}</b></div>
       </div>
-      <p class="notice">${detail.source}. This score supports prioritization; it is not a laboratory result.</p>
+      <p class="notice">${escapeHtml(detail.source)}. This score supports prioritization; it is not a laboratory result.</p>
       <h3>Factor breakdown</h3>
       ${factorRows(detail)}
       <div class="history">
         <h3>Action history</h3>
-        ${(detail.actions || []).map((action) => `<div class="history-item"><b>${action.actionType}</b><small>${new Date(action.createdAt).toLocaleString('en-IN')} · ${action.actor}</small></div>`).join('') || '<small>No actions recorded yet.</small>'}
+        ${(detail.actions || []).map((action) => `<div class="history-item"><b>${escapeHtml(action.actionType)}</b><small>${new Date(action.createdAt).toLocaleString('en-IN')} · ${escapeHtml(action.actor)}</small></div>`).join('') || '<small>No actions recorded yet.</small>'}
       </div>
       <div class="history">
         <h3>Observation history</h3>
