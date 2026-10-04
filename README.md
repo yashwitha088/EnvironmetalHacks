@@ -1,58 +1,82 @@
-# FirstFlush India — dynamic build
+# FirstFlush India — Option A local build
 
-## Run the working application
+## Run locally (no AI key required)
 
 ```bash
 npm install
 npm start
 ```
 
-Open `http://localhost:8787`. This runs the browser UI and API from the same server. Data is persisted in `data/runtime.json`; uploads are stored in `uploads/` during local development.
+Open `http://localhost:8787`.
 
-## Dynamic features
+- Frontend and API are served by the same Express server.
+- Local persistence is stored in `data/runtime.json`.
+- Uploaded observation images are stored in `uploads/` (local demo only).
 
-- API-backed locations and rankings (`GET /api/locations`)
-- Scenario-aware risk recalculation
-- Persistent field observations and action history
-- Validated image uploads up to 5 MB
-- Live Open-Meteo weather when reachable, explicitly labelled fallback otherwise
-- Health/status endpoint
-- Polling refresh every 20 seconds for dashboard/weather status
-- FirstFlush Copilot at `POST /api/chat` with deterministic local fallback
-- CSV export from the API
-- Print-friendly reports in the browser
-- Reset local data with `curl -X POST http://localhost:8787/api/dev/reset`
-
-## FirstFlush Copilot
-
-The local assistant explains current prioritization records and refuses to present estimates as lab measurements. It runs without an API key. For a production AI provider, add a server-side adapter behind `AI_PROVIDER`; never place credentials in frontend code.
-
-## Data honesty
-
-Seed records are fallback records, not official nationwide drain measurements. User submissions are pending verification. Weather responses expose `mode`, `source`, and `updatedAt`. Risk is a relative prioritization estimate, not a toxicity or pollutant-mass measurement.
-
-## API examples
+## Required validation commands
 
 ```bash
-curl http://localhost:8787/api/health
-curl 'http://localhost:8787/api/locations?region=All%20India&dryDays=18&rainfall=heavy'
-curl -X POST http://localhost:8787/api/chat -H 'content-type: application/json' -d '{"message":"Why is the top location risky?"}'
+npm run lint
+npm run test
+npm run build
 ```
 
-## AWS path
+## Option A demo flow (exact)
 
-The current implementation is production-structured and local-complete. For AWS, deploy the frontend with Amplify Hosting and move `server/app.js` behind API Gateway/Lambda, `data/runtime.json` to DynamoDB, and `uploads/` to S3. Set `CORS_ORIGIN`, `DATA_FILE`/adapter settings, weather provider credentials if required, and AI provider credentials only as server-side environment variables. Do not claim national live coverage until verified datasets are connected.
+1. Open dashboard; confirm **Live / Fallback / Offline** status badge and last-updated timestamp.
+2. Change dry days/rainfall/filters; rankings refresh from `GET /api/locations`.
+3. Open a location, record an action, and close.
+4. Add an observation (with optional allowed image upload).
+5. Refresh page; action/observation history remains persisted.
+6. Ask Copilot: `Why is the top location risky?`
+7. Click **Refresh now** (manual) or wait for automatic 20-second polling.
+8. Export CSV from the API-backed report.
 
-## Three-minute demo
+## API endpoints
 
-1. Open the dashboard and show the status badges.
-2. Change dry days/rainfall; rankings update through the API.
-3. Open a location and record a field action.
-4. Add an observation with an image.
-5. Ask FirstFlush Copilot why the top location is risky.
-6. Wait for the live refresh indicator or click refresh.
-7. Download the current priority CSV.
+- `GET /api/health`
+- `GET /api/locations?dryDays=&rainfall=&region=&state=&city=&risk=`
+- `GET /api/locations/:id`
+- `POST /api/locations/:id/actions`
+- `POST /api/observations` (multipart form; image types: jpeg/png/webp/gif, max 5 MB)
+- `GET /api/weather?lat=&lon=`
+- `POST /api/chat`
+- `GET /api/reports/priority.csv`
+- `POST /api/dev/reset` (local demo reset)
 
-## Limitations
+## Leaflet / OpenStreetMap map
 
-This repository provides a complete working local dynamic application. Nationwide official drain coverage, authenticated multi-user roles, DynamoDB/S3 adapters, and calibrated laboratory validation remain integration steps requiring approved data, cloud credentials, and operational ownership.
+- Uses Leaflet with OpenStreetMap-compatible tiles:
+  - Tile URL: `https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png`
+  - Attribution: `© OpenStreetMap contributors`
+- Markers are drawn from seeded API lat/lon records and filtered with the active scenario/query.
+- If map tiles fail, the UI switches to a graceful fallback list that still opens full location details.
+
+## FirstFlush Copilot (local fallback)
+
+`POST /api/chat` runs a deterministic local assistant grounded in current API records and selected scenario/location context.
+
+It explicitly does **not** claim:
+- laboratory toxicity results
+- exact pollutant quantities
+
+No external AI key is required for Option A.
+
+## Fallback behavior and status clarity
+
+- Dashboard polls every **20 seconds** plus manual refresh.
+- Weather endpoint labels `mode`, `source`, and `updatedAt`.
+- System badge reports **Live**, **Fallback**, or **Offline**.
+- `lastUpdated` always reflects latest successful `GET /api/locations` refresh.
+
+## AWS-ready adapter path (without requiring AWS credentials now)
+
+Current local persistence uses an adapter boundary at:
+- `server/adapters/persistence.js` (local JSON implementation)
+
+Future deployment path:
+- Replace persistence adapter internals with DynamoDB implementation.
+- Replace local uploads path with S3-backed storage adapter.
+- Keep route contracts unchanged so frontend continues to work with the same API.
+
+Do not add secrets to source code. Configure provider credentials only through server-side environment variables in deployment.

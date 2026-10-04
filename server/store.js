@@ -14,7 +14,17 @@ export const seed = {
   ], observations: [], actions: []
 };
 
+function cloneSeed() {
+  return JSON.parse(JSON.stringify(seed));
+}
+
 export async function readStore(file) {
-  try { return JSON.parse(await fs.readFile(file, 'utf8')); } catch { await fs.mkdir(path.dirname(file), {recursive:true}); await fs.writeFile(file, JSON.stringify(seed, null, 2)); return structuredClone(seed); }
+  try {
+    return JSON.parse(await fs.readFile(file, 'utf8'));
+  } catch {
+    await fs.mkdir(path.dirname(file), {recursive:true});
+    await fs.writeFile(file, JSON.stringify(seed, null, 2));
+    return cloneSeed();
+  }
 }
 export async function writeStore(file, data) { await fs.mkdir(path.dirname(file), {recursive:true}); await fs.writeFile(file, JSON.stringify(data, null, 2)); return data; }

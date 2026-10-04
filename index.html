@@ -1,1 +1,115 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="FirstFlush India real-time runoff prioritization"><title>FirstFlush India</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="styles.css"></head><body><header class="topbar"><a class="brand" href="#top"><span class="mark">⌁</span><span>FirstFlush <b>India</b></span></a><nav><a href="#overview">Overview</a><a href="#mapSection">Live map</a><a href="#queue">Priorities</a></nav><div class="top-right"><span id="systemStatus" class="status-pill pending">Connecting…</span><button id="chatOpen" class="outline-button">✦ Copilot</button></div></header><main id="top" class="page"><section class="hero" id="overview"><div><p class="eyebrow">REAL-TIME RUNOFF INTELLIGENCE · INDIA</p><h1>Act before polluted runoff reaches the water.</h1><p class="lead">A live operational view for ranking drainage points, recording field action, and explaining every estimate before the first flush.</p><div class="hero-actions"><button id="refresh" class="primary-button">Refresh now <span>↻</span></button><button id="method" class="link-button">How the model works ↗</button></div><div class="trust-row"><span>● API connected</span><span>● Source-aware</span><span>● Lab-honest</span></div></div><div class="hero-panel"><div class="panel-top"><span>System status</span><span id="lastUpdated">Waiting for update</span></div><div class="signal"><span id="weatherSignal" class="signal-dot"></span><div><b id="weatherMode">Checking weather provider</b><small id="weatherSource">Open-Meteo / fallback</small></div></div><div class="hero-stat"><strong id="heroRisk">—</strong><span>top relative-risk score<br><small>not a laboratory result</small></span></div><div class="mini-bars"><span style="width:88%"></span><span style="width:74%"></span><span style="width:61%"></span></div></div></section><section class="control-card"><div><p class="eyebrow">LIVE ASSESSMENT</p><h2>Change the rainfall context</h2></div><label>Region<select id="region"><option>All India</option><option>South India</option><option>North India</option><option>West India</option><option>East India</option></select></label><label>Dry spell <output id="dryOut">18 days</output><input id="dry" type="range" min="1" max="30" value="18"></label><label>Rainfall<select id="rain"><option value="light">Light · 8 mm</option><option value="moderate">Moderate · 24 mm</option><option value="heavy" selected>Heavy · 62 mm</option><option value="extreme">Very heavy · 110 mm</option></select></label><button id="reset" class="secondary-button">Reset</button><p class="notice">Data status is shown explicitly. Fallback records are not official nationwide drain measurements.</p></section><section class="metrics"><article><span>Monitored locations</span><b id="locationCount">—</b><small>API-backed records</small></article><article><span>High-risk now</span><b id="highCount">—</b><small>relative priority</small></article><article><span>Actions recorded</span><b id="actionCount">—</b><small>persistent audit trail</small></article><article><span>Data confidence</span><b id="confidence">—</b><small>source-aware estimate</small></article></section><section id="mapSection" class="section"><div class="section-head"><div><p class="eyebrow">LIVE PRIORITY MAP</p><h2>Where should action happen first?</h2></div><div class="map-key"><i class="dot vh"></i> Very high <i class="dot hi"></i> High <i class="dot me"></i> Medium</div></div><div class="map-layout"><div class="map-card"><svg id="map" viewBox="0 0 500 560" role="img" aria-label="India priority map"><path class="india" d="M205 25 286 44 340 100 385 126 366 180 418 245 372 288 350 362 309 426 260 515 223 444 176 393 139 333 95 292 122 235 101 173 144 139 159 76Z"></path><path class="river" d="M238 70C215 170 300 210 231 290S270 420 220 500M142 265C210 276 265 250 347 270"></path><g id="pins"></g></svg><div class="map-footer"><span>● Tap a point for factor breakdown</span><span id="coverage">Coverage loading…</span></div></div><aside class="priority-card"><p class="eyebrow">TOP PRIORITY NOW</p><h3 id="topName">Loading…</h3><div class="score"><strong id="topScore">—</strong><span>/100<br><small>relative risk</small></span></div><p id="topSummary">Loading live assessment…</p><div id="topReasons" class="reasons"></div><button id="topOpen" class="primary-button wide">Open assessment →</button></aside></div></section><section id="queue" class="section queue-grid"><div class="queue-card"><div class="section-head"><div><p class="eyebrow">ACTION QUEUE</p><h2>Priority locations</h2></div><div class="filters"><select id="state"><option value="all">All states</option></select><select id="city"><option value="all">All cities</option></select><select id="risk"><option value="all">All levels</option><option value="very-high">Very high</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></div></div><div id="queueList" class="queue-list"><div class="loading">Loading API-backed locations…</div></div></div><aside class="impact-card"><p class="eyebrow">OPERATIONS</p><h2>Turn estimates into action.</h2><p>Record what your team sees, keep the audit trail, and export the current ranked list.</p><button id="observeOpen" class="secondary-button wide">＋ Add observation</button><button id="export" class="link-button wide">Download CSV ↓</button><div class="provider-box"><b>Data contract</b><span>Live provider · field observation · fallback · model estimate</span></div></aside></section><section class="copilot-teaser"><div><p class="eyebrow">FIRSTFLUSH COPILOT</p><h2>Ask the system, not a generic chatbot.</h2><p>Get explanations grounded in the current risk ranking, weather mode, confidence, and recorded field actions.</p></div><button id="chatOpen2" class="primary-button">Open Copilot ✦</button></section><section id="methodology" class="method"><p class="eyebrow">METHOD & DATA HONESTY</p><h2>Explainable by design.</h2><div class="method-grid"><div><b>01 · Estimate</b><p>Dry spell, rainfall intensity, paved catchment, traffic, construction, waste activity, and water-body sensitivity.</p></div><div><b>02 · Prioritize</b><p>Rank monitored points by relative risk and show confidence and provenance separately.</p></div><div><b>03 · Act</b><p>Record inspections, cleaning, temporary screens, samples, and monitoring with timestamps.</p></div></div><p class="notice">FirstFlush is a prioritization estimate, not a laboratory water-quality measurement or an official municipal alert.</p></section></main><footer>FirstFlush India · Environmental Hacks 2026 <span>Built for prevention, not panic.</span></footer><dialog id="detail"><div class="dialog-head"><div><p class="eyebrow">LOCATION ASSESSMENT</p><h2 id="detailTitle">—</h2></div><button data-close="detail">×</button></div><div id="detailBody"></div><div class="dialog-actions"><button data-close="detail" class="secondary-button">Close</button><button id="saveAction" class="primary-button">Record action →</button></div></dialog><dialog id="observation"><div class="dialog-head"><div><p class="eyebrow">FIELD INPUT</p><h2>Add observation</h2></div><button data-close="observation">×</button></div><form id="observationForm"><label>Location name<input name="name" required maxlength="120" placeholder="Drain near market road"></label><label>State<select name="state"><option>Telangana</option><option>Karnataka</option><option>Delhi</option><option>Maharashtra</option><option>Tamil Nadu</option><option>West Bengal</option><option>Assam</option></select></label><label>Condition<select name="condition"><option>Blocked / littered</option><option>Partially blocked</option><option>Clear</option><option>Standing water</option></select></label><label>Notes<textarea name="notes" rows="3" maxlength="500"></textarea></label><label>Photo evidence<input type="file" name="photo" accept="image/jpeg,image/png,image/webp,image/gif"><small>Maximum 5 MB. Stored locally in development.</small></label><div class="dialog-actions"><button type="button" data-close="observation" class="secondary-button">Cancel</button><button class="primary-button">Save observation →</button></div></form></dialog><dialog id="chat"><div class="dialog-head"><div><p class="eyebrow">AI-GROUNDED ASSISTANT</p><h2>FirstFlush Copilot <span class="ai-badge">AI</span></h2></div><button data-close="chat">×</button></div><div id="chatMessages" class="chat-messages"><div class="assistant-msg">I can explain current priorities, data confidence, weather mode, recommended action, and the limits of this estimate.</div></div><form id="chatForm" class="chat-form"><input id="chatInput" maxlength="500" placeholder="Why is the top location risky?" required><button class="primary-button">Send</button></form><small class="ai-note">AI-generated explanation grounded in FirstFlush records. It does not provide laboratory or toxicity claims.</small></dialog><div id="toast" class="toast" role="status" aria-live="polite"></div><script src="app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="FirstFlush India real-time runoff prioritization">
+  <title>FirstFlush India</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#top"><span class="mark">⌁</span><span>FirstFlush <b>India</b></span></a>
+    <nav><a href="#overview">Overview</a><a href="#mapSection">Live map</a><a href="#queue">Priorities</a></nav>
+    <div class="top-right"><span id="systemStatus" class="status-pill pending">Connecting…</span><button id="chatOpen" class="outline-button">✦ Copilot</button></div>
+  </header>
+
+  <main id="top" class="page">
+    <section class="hero" id="overview">
+      <div>
+        <p class="eyebrow">REAL-TIME RUNOFF INTELLIGENCE · INDIA</p>
+        <h1>Act before polluted runoff reaches the water.</h1>
+        <p class="lead">A live operational view for ranking drainage points, recording field action, and explaining every estimate before the first flush.</p>
+        <div class="hero-actions"><button id="refresh" class="primary-button">Refresh now <span>↻</span></button><button id="method" class="link-button">How the model works ↗</button></div>
+        <div class="trust-row"><span>● API connected</span><span>● Source-aware</span><span>● Lab-honest</span></div>
+      </div>
+      <div class="hero-panel">
+        <div class="panel-top"><span>System status</span><span id="lastUpdated">Waiting for update</span></div>
+        <div class="signal"><span id="weatherSignal" class="signal-dot"></span><div><b id="weatherMode">Checking weather provider</b><small id="weatherSource">Open-Meteo / fallback</small></div></div>
+        <div class="hero-stat"><strong id="heroRisk">—</strong><span>top relative-risk score<br><small>not a laboratory result</small></span></div>
+        <div class="mini-bars"><span style="width:88%"></span><span style="width:74%"></span><span style="width:61%"></span></div>
+      </div>
+    </section>
+
+    <section class="control-card">
+      <div><p class="eyebrow">LIVE ASSESSMENT</p><h2>Change the rainfall context</h2></div>
+      <label>Region<select id="region"><option>All India</option><option>South India</option><option>North India</option><option>West India</option><option>East India</option></select></label>
+      <label>Dry spell <output id="dryOut">18 days</output><input id="dry" type="range" min="1" max="30" value="18"></label>
+      <label>Rainfall<select id="rain"><option value="light">Light · 8 mm</option><option value="moderate">Moderate · 24 mm</option><option value="heavy" selected>Heavy · 62 mm</option><option value="extreme">Very heavy · 110 mm</option></select></label>
+      <button id="reset" class="secondary-button">Reset</button>
+      <p class="notice">Data status is shown explicitly. Fallback records are not official nationwide drain measurements.</p>
+    </section>
+
+    <section class="metrics">
+      <article><span>Monitored locations</span><b id="locationCount">—</b><small>API-backed records</small></article>
+      <article><span>High-risk now</span><b id="highCount">—</b><small>relative priority</small></article>
+      <article><span>Actions recorded</span><b id="actionCount">—</b><small>persistent audit trail</small></article>
+      <article><span>Data confidence</span><b id="confidence">—</b><small>source-aware estimate</small></article>
+    </section>
+
+    <section id="mapSection" class="section">
+      <div class="section-head"><div><p class="eyebrow">LIVE PRIORITY MAP</p><h2>Where should action happen first?</h2></div><div class="map-key"><i class="dot vh"></i> Very high <i class="dot hi"></i> High <i class="dot me"></i> Medium</div></div>
+      <div class="map-layout">
+        <div class="map-card">
+          <div id="leafletMap" role="region" aria-label="India priority map"></div>
+          <div id="mapFallback" class="map-fallback" hidden></div>
+          <div class="map-footer"><span>● Tap a marker for factor breakdown</span><span id="coverage">Coverage loading…</span></div>
+        </div>
+        <aside class="priority-card"><p class="eyebrow">TOP PRIORITY NOW</p><h3 id="topName">Loading…</h3><div class="score"><strong id="topScore">—</strong><span>/100<br><small>relative risk</small></span></div><p id="topSummary">Loading live assessment…</p><div id="topReasons" class="reasons"></div><button id="topOpen" class="primary-button wide">Open assessment →</button></aside>
+      </div>
+    </section>
+
+    <section id="queue" class="section queue-grid">
+      <div class="queue-card">
+        <div class="section-head"><div><p class="eyebrow">ACTION QUEUE</p><h2>Priority locations</h2></div><div class="filters"><select id="state"><option value="all">All states</option></select><select id="city"><option value="all">All cities</option></select><select id="risk"><option value="all">All levels</option><option value="very-high">Very high</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></div></div>
+        <div id="queueList" class="queue-list"><div class="loading">Loading API-backed locations…</div></div>
+      </div>
+      <aside class="impact-card"><p class="eyebrow">OPERATIONS</p><h2>Turn estimates into action.</h2><p>Record what your team sees, keep the audit trail, and export the current ranked list.</p><button id="observationOpen" class="secondary-button wide">＋ Add observation</button><button id="export" class="link-button wide">Download CSV ↓</button><div class="provider-box"><b>Data contract</b><span>Live provider · field observation · fallback · model estimate</span></div></aside>
+    </section>
+
+    <section class="copilot-teaser"><div><p class="eyebrow">FIRSTFLUSH COPILOT</p><h2>Ask the system, not a generic chatbot.</h2><p>Get explanations grounded in the current risk ranking, weather mode, confidence, and recorded field actions.</p></div><button id="chatOpen2" class="primary-button">Open Copilot ✦</button></section>
+
+    <section id="methodology" class="method">
+      <p class="eyebrow">METHOD & DATA HONESTY</p><h2>Explainable by design.</h2>
+      <div class="method-grid"><div><b>01 · Estimate</b><p>Dry spell, rainfall intensity, paved catchment, traffic, construction, waste activity, and water-body sensitivity.</p></div><div><b>02 · Prioritize</b><p>Rank monitored points by relative risk and show confidence and provenance separately.</p></div><div><b>03 · Act</b><p>Record inspections, cleaning, temporary screens, samples, and monitoring with timestamps.</p></div></div>
+      <p class="notice">FirstFlush is a prioritization estimate, not a laboratory water-quality measurement or an official municipal alert.</p>
+    </section>
+  </main>
+
+  <footer>FirstFlush India · Environmental Hacks 2026 <span>Built for prevention, not panic.</span></footer>
+
+  <dialog id="detail">
+    <div class="dialog-head"><div><p class="eyebrow">LOCATION ASSESSMENT</p><h2 id="detailTitle">—</h2></div><button data-close="detail">×</button></div>
+    <div id="detailBody"></div>
+    <div class="dialog-actions"><button data-close="detail" class="secondary-button">Close</button><button id="saveAction" class="primary-button">Record action →</button></div>
+  </dialog>
+
+  <dialog id="observation">
+    <div class="dialog-head"><div><p class="eyebrow">FIELD INPUT</p><h2>Add observation</h2></div><button data-close="observation">×</button></div>
+    <form id="observationForm">
+      <input type="hidden" id="observationLocationId" name="locationId">
+      <label>Location name<input id="observationName" name="name" required maxlength="120" placeholder="Drain near market road"></label>
+      <label>State<select name="state"><option>Telangana</option><option>Karnataka</option><option>Delhi</option><option>Maharashtra</option><option>Tamil Nadu</option><option>West Bengal</option><option>Assam</option></select></label>
+      <label>Condition<select name="condition"><option>Blocked / littered</option><option>Partially blocked</option><option>Clear</option><option>Standing water</option></select></label>
+      <label>Notes<textarea name="notes" rows="3" maxlength="500"></textarea></label>
+      <label>Photo evidence<input type="file" name="photo" accept="image/jpeg,image/png,image/webp,image/gif"><small>Maximum 5 MB. Stored locally in development.</small></label>
+      <div class="dialog-actions"><button type="button" data-close="observation" class="secondary-button">Cancel</button><button class="primary-button">Save observation →</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="chat">
+    <div class="dialog-head"><div><p class="eyebrow">AI-GROUNDED ASSISTANT</p><h2>FirstFlush Copilot <span class="ai-badge">AI</span></h2></div><button data-close="chat">×</button></div>
+    <div id="chatMessages" class="chat-messages"><div class="assistant-msg">I can explain current priorities, data confidence, weather mode, recommended action, and the limits of this estimate.</div></div>
+    <form id="chatForm" class="chat-form"><input id="chatInput" maxlength="500" placeholder="Why is the top location risky?" required><button class="primary-button">Send</button></form>
+    <small class="ai-note">AI-generated explanation grounded in FirstFlush records. It does not provide laboratory or toxicity claims.</small>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="app.js"></script>
+</body>
+</html>
